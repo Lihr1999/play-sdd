@@ -1,0 +1,49 @@
+[
+  {
+    "category": "客户端-DemoCampaign任务列表",
+    "scenarios": {
+      "列表与展示": [
+        {"id": "TC-001", "title": "进入活动页自动拉取任务列表", "priority": "P0", "precondition": "活动存在且已配置任务", "steps": ["打开 DemoCampaign 对应活动页"], "testData": "userId、campaignId 有效", "expectedResult": "发起 GET /api/game/tasks；任务卡片渲染"},
+        {"id": "TC-002", "title": "新用户任务初始状态", "priority": "P0", "precondition": "用户对该活动无进度行", "steps": ["首次进入活动页"], "testData": "-", "expectedResult": "currentCount=0，status=in_progress；进度条为0"},
+        {"id": "TC-003", "title": "累计型进行中进度条", "priority": "P0", "precondition": "存在 cumulative 且 targetCount>1", "steps": ["玩法使进度为中间值"], "testData": "-", "expectedResult": "展示比例正确的进度条"},
+        {"id": "TC-004", "title": "已完成显示领取按钮", "priority": "P0", "precondition": "status=completed", "steps": ["查看任务卡片"], "testData": "-", "expectedResult": "显示可点击领取按钮"},
+        {"id": "TC-005", "title": "已领取状态展示", "priority": "P0", "precondition": "status=claimed", "steps": ["查看任务卡片"], "testData": "-", "expectedResult": "显示已领取文案；无领取按钮"},
+        {"id": "TC-006", "title": "进行中不显示领取按钮", "priority": "P0", "precondition": "status=in_progress", "steps": ["查看任务卡片"], "testData": "-", "expectedResult": "无领取按钮"},
+        {"id": "TC-012", "title": "任务排序与 sort_order 一致", "priority": "P1", "precondition": "多条任务 sort_order 不同", "steps": ["进入页面"], "testData": "-", "expectedResult": "顺序与 sort_order 升序一致"},
+        {"id": "TC-013", "title": "空任务列表", "priority": "P2", "precondition": "活动下无任务", "steps": ["进入页面"], "testData": "-", "expectedResult": "无卡片或空态；不报错"}
+      ],
+      "玩法与领取": [
+        {"id": "TC-007", "title": "玩法返回 taskUpdates 后合并", "priority": "P0", "precondition": "可执行玩法", "steps": ["完成一次玩法至成功"], "testData": "-", "expectedResult": "UI 与 taskUpdates 一致；进度更新"},
+        {"id": "TC-008", "title": "玩法无任务变更", "priority": "P1", "precondition": "本次不产生任务进度", "steps": ["玩法成功"], "testData": "taskUpdates=[]", "expectedResult": "任务 UI 无任务相关变化"},
+        {"id": "TC-009", "title": "领取成功打开奖品结果", "priority": "P0", "precondition": "任务 completed", "steps": ["点击领取"], "testData": "-", "expectedResult": "POST claim 成功；奖品弹层与现网一致"},
+        {"id": "TC-010", "title": "领取后变为已领取", "priority": "P0", "precondition": "已 completed", "steps": ["领取成功并关闭弹层"], "testData": "-", "expectedResult": "展示 claimed；无领取按钮"},
+        {"id": "TC-011", "title": "防重复领取", "priority": "P1", "precondition": "已 claimed 或请求中", "steps": ["再次尝试领取"], "testData": "-", "expectedResult": "不重复成功领奖；与 409 策略一致"}
+      ]
+    }
+  },
+  {
+    "category": "服务端-任务接口与玩法联动",
+    "scenarios": {
+      "GET任务列表": [
+        {"id": "TC-101", "title": "正常返回任务与进度", "priority": "P0", "precondition": "合法参数与种子数据", "steps": ["GET /api/game/tasks"], "testData": "userId,campaignId", "expectedResult": "200；含各任务 progress 字段"},
+        {"id": "TC-102", "title": "无任务空数组", "priority": "P1", "precondition": "campaign 无任务", "steps": ["GET"], "testData": "-", "expectedResult": "200；[]"},
+        {"id": "TC-103", "title": "鉴权失败", "priority": "P1", "precondition": "无效 token", "steps": ["GET"], "testData": "-", "expectedResult": "401/403 与项目统一"}
+      ],
+      "POST领取": [
+        {"id": "TC-201", "title": "completed 正常领奖", "priority": "P0", "precondition": "有库存", "steps": ["POST claim"], "testData": "completed", "expectedResult": "200；prize；进度 claimed"},
+        {"id": "TC-202", "title": "重复领取 409", "priority": "P0", "precondition": "已 claimed", "steps": ["再次 POST"], "testData": "-", "expectedResult": "409"},
+        {"id": "TC-203", "title": "任务不存在 404", "priority": "P1", "precondition": "非法 taskId", "steps": ["POST"], "testData": "-", "expectedResult": "404"},
+        {"id": "TC-204", "title": "非 completed 不可领", "priority": "P0", "precondition": "in_progress", "steps": ["POST claim"], "testData": "-", "expectedResult": "4xx"},
+        {"id": "TC-205", "title": "奖品无库存", "priority": "P1", "precondition": "库存0", "steps": ["POST claim"], "testData": "-", "expectedResult": "走无库存错误路径"}
+      ],
+      "Play与taskUpdates": [
+        {"id": "TC-301", "title": "play 触发累计", "priority": "P0", "precondition": "trigger=play", "steps": ["执行玩法"], "testData": "-", "expectedResult": "对应任务计数+1"},
+        {"id": "TC-302", "title": "win 仅中奖累计", "priority": "P0", "precondition": "trigger=win", "steps": ["无奖品玩法/有奖品玩法各一次"], "testData": "prize null/non-null", "expectedResult": "仅中奖时累计 win 任务"},
+        {"id": "TC-303", "title": "claimed 不再累计", "priority": "P0", "precondition": "status=claimed", "steps": ["玩法"], "testData": "-", "expectedResult": "该任务计数不变"},
+        {"id": "TC-304", "title": "累计型达标 completed", "priority": "P0", "precondition": "cumulative", "steps": ["玩法至达标"], "testData": "-", "expectedResult": "completed；taskUpdates.completed=true"},
+        {"id": "TC-305", "title": "单次型一次完成", "priority": "P0", "precondition": "once,target=1", "steps": ["一次匹配玩法"], "testData": "-", "expectedResult": "即 completed"},
+        {"id": "TC-306", "title": "任务异常不拖垮玩法", "priority": "P1", "precondition": "任务更新异常被吞", "steps": ["玩法"], "testData": "-", "expectedResult": "玩法仍成功；符合设计不失败 play"}
+      ]
+    }
+  }
+]
